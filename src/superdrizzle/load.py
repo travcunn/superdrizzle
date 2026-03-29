@@ -2,24 +2,37 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import rawpy
 from PIL import Image
+
+RAW_EXTENSIONS = {
+    ".dng", ".cr2", ".cr3", ".nef", ".arw", ".orf", ".rw2",
+    ".raf", ".srw", ".pef", ".raw", ".3fr", ".ari", ".bay",
+    ".cap", ".iiq", ".erf", ".fff", ".mef", ".mos", ".mrw",
+    ".nrw", ".ptx", ".r3d", ".rwl", ".rwz", ".x3f",
+}
 
 
 def load(source: "str | Path | np.ndarray | Image.Image") -> np.ndarray:
     """Normalize any supported image source to a float32 RGB numpy array [0, 1].
 
     Supported inputs:
-        - str or pathlib.Path: file path (EXIF orientation applied)
+        - str or pathlib.Path: file path (JPEG/PNG/TIFF + RAW formats)
         - file-like with .read(): binary stream (JPEG/PNG bytes)
         - PIL.Image.Image: converted to RGB numpy
         - np.ndarray uint8: normalized to float32 / 255
         - np.ndarray float32: returned as-is
 
+    RAW formats supported: DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF, and others.
+
     Returns:
         float32 ndarray, shape (H, W, 3), range [0, 1]
     """
     if isinstance(source, (str, Path)):
-        return _load_path(str(source))
+        path = str(source)
+        if Path(path).suffix.lower() in RAW_EXTENSIONS:
+            return _load_raw(path)
+        return _load_path(path)
 
     if hasattr(source, "read"):
         return _load_file_object(source)
@@ -34,6 +47,17 @@ def load(source: "str | Path | np.ndarray | Image.Image") -> np.ndarray:
         f"Unsupported image type: {type(source).__name__}. "
         "Expected str, Path, file object, PIL Image, or numpy array."
     )
+
+
+def _load_raw(path: str) -> np.ndarray:
+    """Load a RAW file via rawpy/LibRaw. Returns float32 RGB [0, 1]."""
+    with rawpy.imread(path) as raw:
+        rgb = raw.postprocess(
+            use_camera_wb=True,
+            no_auto_bright=True,
+            output_bps=16,
+        )
+    return rgb.astype(np.float32) / 65535.0
 
 
 def _load_path(path: str) -> np.ndarray:
