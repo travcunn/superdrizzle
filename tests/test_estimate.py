@@ -49,3 +49,18 @@ def test_none_transforms_are_skipped():
     scale = estimate_scale(transforms)
     # Only 2 frames, partial coverage of 2x2 grid -> scale 1
     assert scale == 1
+
+
+def test_quarter_pixel_dithers_gives_4x():
+    offsets = [(i / 4.0, j / 4.0) for i in range(4) for j in range(4)]
+    transforms = [np.array([[1, 0, dx], [0, 1, dy]]) for dx, dy in offsets]
+    scale = estimate_scale(transforms)
+    assert scale == 4
+
+
+def test_empty_transforms_gives_1x():
+    assert estimate_scale([]) == 1
+
+
+def test_all_none_transforms_gives_1x():
+    assert estimate_scale([None, None, None]) == 1

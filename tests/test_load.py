@@ -82,3 +82,41 @@ def test_load_from_bytes_io():
     result = load(bio)
     assert result.dtype == np.float32
     assert result.shape == (10, 10, 3)
+
+
+def test_load_bad_path_raises():
+    try:
+        load("/nonexistent/path/image.jpg")
+        assert False
+    except FileNotFoundError:
+        pass
+
+
+def test_load_numpy_float64_raises():
+    arr = np.ones((10, 10, 3), dtype=np.float64)
+    try:
+        load(arr)
+        assert False
+    except TypeError:
+        pass
+
+
+def test_load_rgba_pil_image():
+    rgba = Image.fromarray(np.zeros((10, 10, 4), dtype=np.uint8), mode="RGBA")
+    result = load(rgba)
+    assert result.shape == (10, 10, 3)
+
+
+def test_load_grayscale_pil_image():
+    gray = Image.fromarray(np.zeros((10, 10), dtype=np.uint8), mode="L")
+    result = load(gray)
+    assert result.shape == (10, 10, 3)
+
+
+def test_load_corrupted_file_object_raises():
+    bio = io.BytesIO(b"not an image at all")
+    try:
+        load(bio)
+        assert False
+    except ValueError:
+        pass

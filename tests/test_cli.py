@@ -65,3 +65,27 @@ def test_cli_auto_scale():
         )
         assert result.returncode == 0, f"stderr: {result.stderr}"
         assert os.path.exists(out)
+
+
+def test_cli_bad_file_path_exits_with_error():
+    result = subprocess.run(
+        ["uv", "run", "superdrizzle", "/nonexistent/frame.png", "-o", "/tmp/out.png"],
+        capture_output=True,
+        text=True,
+        cwd="/Users/tcunningham/drizzle",
+    )
+    assert result.returncode != 0
+
+
+def test_cli_single_image():
+    with tempfile.TemporaryDirectory() as d:
+        paths = _make_test_scene(d, n_frames=1)
+        out = os.path.join(d, "result.png")
+        result = subprocess.run(
+            ["uv", "run", "superdrizzle"] + paths + ["-o", out],
+            capture_output=True,
+            text=True,
+            cwd="/Users/tcunningham/drizzle",
+        )
+        assert result.returncode == 0, f"stderr: {result.stderr}"
+        assert os.path.exists(out)

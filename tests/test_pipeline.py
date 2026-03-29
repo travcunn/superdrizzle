@@ -123,3 +123,45 @@ def test_accepts_numpy_arrays():
     arrays = [np.random.rand(50, 50, 3).astype(np.float32) for _ in range(3)]
     pipe = Pipeline(arrays)
     assert len(pipe._images) == 3
+
+
+def test_mismatched_dimensions_raises():
+    arrays = [
+        np.zeros((50, 50, 3), dtype=np.float32),
+        np.zeros((60, 60, 3), dtype=np.float32),
+    ]
+    try:
+        Pipeline(arrays)
+        assert False
+    except ValueError:
+        pass
+
+
+def test_add_dimension_mismatch_raises():
+    pipe = Pipeline([np.zeros((50, 50, 3), dtype=np.float32)])
+    try:
+        pipe.add(np.zeros((60, 60, 3), dtype=np.float32))
+        assert False
+    except ValueError:
+        pass
+
+
+def test_combine_no_aligned_frames_raises():
+    """Pipeline with featureless images where alignment fails should raise ValueError."""
+    # Solid color images have no features for alignment to match
+    solid = np.full((50, 50, 3), 0.5, dtype=np.float32)
+    pipe = Pipeline([solid, solid, solid])
+    # Manually force all transforms to None to simulate total alignment failure
+    pipe._transforms = [None, None, None]
+    try:
+        pipe.combine(scale=1)
+        assert False
+    except ValueError:
+        pass
+
+
+def test_single_image_pipeline():
+    img = np.random.rand(50, 50, 3).astype(np.float32)
+    pipe = Pipeline([img])
+    result, weights = pipe.combine(scale=1)
+    assert isinstance(result, Image.Image)
