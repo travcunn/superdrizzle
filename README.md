@@ -133,55 +133,58 @@ pil_image.save("output.png")
 
 ## How it works
 
-The pipeline has four stages:
+```mermaid
+flowchart LR
+    A["Input frames\n(JPEG, PNG, PIL, numpy)"] --> B["Align\nORB + RANSAC\naffine transforms"]
+    B --> C["Estimate scale\nanalyze sub-pixel\ndither coverage"]
+    C --> D["Drizzle\nshrink pixels into drops,\nmap onto finer grid,\narea-weighted accumulation"]
+    D --> E["Output\nnormalize by\nweight map"]
+```
 
-1. **Align** - detect ORB keypoints in each frame, match against a reference
-   frame, and RANSAC-fit a full affine transform (translation, rotation, scale,
-   shear).
+**Align** - detect ORB keypoints in each frame, match against a reference
+frame, and RANSAC-fit a full affine transform (translation, rotation, scale,
+shear).
 
-2. **Estimate scale** - analyze the sub-pixel fractional offsets across all
-   frames. If the dither pattern covers a 2x2 grid of sub-pixel phases, 2x
-   superresolution is justified. If 3x3, then 3x, and so on.
+**Estimate scale** - analyze the sub-pixel fractional offsets across all
+frames. If the dither pattern covers a 2x2 grid of sub-pixel phases, 2x
+superresolution is justified. If 3x3, then 3x, and so on.
 
-3. **Drizzle** - the core Fruchter & Hook algorithm. Each input pixel is shrunk
-   into a smaller "drop" (controlled by `pixfrac`) and mapped through its
-   affine transform onto the higher-resolution output grid. The contribution to
-   each output pixel is weighted by the overlap area between the drop and the
-   output pixel.
+**Drizzle** - the core Fruchter & Hook algorithm. Each input pixel is shrunk
+into a smaller "drop" (controlled by `pixfrac`) and mapped through its affine
+transform onto the higher-resolution output grid. The contribution to each
+output pixel is weighted by the overlap area between the drop and the output
+pixel.
 
-   ```
-   Input pixel        "Drop"           Output grid (2x)
-   (original)         (shrunk)         (finer pixels)
+```mermaid
+flowchart LR
+    subgraph Input
+        P["Input pixel"]
+    end
+    subgraph Shrink
+        D["Drop\n(pixfrac = 0.6)"]
+    end
+    subgraph Output ["Output grid (2x finer)"]
+        direction TB
+        O1["pixel"] --- O2["pixel"]
+        O3["pixel"] --- O4["pixel"]
+    end
+    P -- "shrink by\npixfrac" --> D
+    D -- "affine\ntransform" --> Output
+```
 
-   +----------+       +------+         +-----+-----+
-   |          |       |      |         |     |     |
-   |          |  -->  | drop |  ---->  |  +--+--+  |
-   |          |       |      |         |  |  :  |  |
-   +----------+       +------+         +--+--+--+--+
-                                       |  |  :  |  |
-   pixfrac = 1.0      pixfrac = 0.6   |  +--+--+  |
-   means no shrink    is the default   |     |     |
-                                       +-----+-----+
+The drop lands across multiple output pixels. Each output pixel receives a
+share of the input value proportional to the overlap area. By shrinking the
+pixel before mapping, drizzle avoids reconvolving the image with the
+detector's pixel response function, which is what preserves resolution.
 
-                                       The drop lands across
-                                       4 output pixels. Each
-                                       gets a share of the
-                                       value, weighted by
-                                       the overlap area.
-   ```
+The `pixfrac` parameter controls the trade-off:
+- `pixfrac=1.0` (shift-and-add) - no shrinking, maximum S/N, but blurs
+- `pixfrac=0.0` (interlacing) - point samples, maximum resolution, but
+  requires perfectly placed dithers
+- `pixfrac=0.6` (default) - a good balance for most real-world data
 
-   The key insight: by shrinking the input pixel before mapping it, drizzle
-   avoids reconvolving the image with the detector's pixel response function.
-   This is what preserves resolution. The `pixfrac` parameter controls the
-   trade-off:
-
-   - `pixfrac=1.0` (shift-and-add) - no shrinking, maximum S/N, but blurs
-   - `pixfrac=0.0` (interlacing) - point samples, maximum resolution, but
-     requires perfectly placed dithers
-   - `pixfrac=0.6` (default) - a good balance for most real-world data
-
-4. **Output** - normalize the accumulated image by the weight map and convert
-   to the requested format.
+**Output** - normalize the accumulated image by the weight map and convert to
+the requested format.
 
 ## Dependencies
 
