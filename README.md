@@ -150,18 +150,24 @@ The pipeline has four stages:
    output pixel.
 
    ```
-   Input Frame               Output Grid (2x)
-    _________                 _________________
-   | A  | B  |               |    |    |    |   |
-   |  .-+-.  |    affine     | .--+-. /    |   |
-   |  |/| |  |   -------->   | |A | / |    |   |
-   |--+-+--+-|   transform   |-+--+/--+----|---|
-   |  | |/ |  |   + shrink   | | / B  |    |   |
-   |  `-+--'  |               | +----'|    |   |
-   |____|_____|               |____|____|____|___|
+   Input pixel        "Drop"           Output grid (2x)
+   (original)         (shrunk)         (finer pixels)
 
-   Shrunken "drops"           Area-weighted
-   from input pixels          accumulation
+   +----------+       +------+         +-----+-----+
+   |          |       |      |         |     |     |
+   |          |  -->  | drop |  ---->  |  +--+--+  |
+   |          |       |      |         |  |  :  |  |
+   +----------+       +------+         +--+--+--+--+
+                                       |  |  :  |  |
+   pixfrac = 1.0      pixfrac = 0.6   |  +--+--+  |
+   means no shrink    is the default   |     |     |
+                                       +-----+-----+
+
+                                       The drop lands across
+                                       4 output pixels. Each
+                                       gets a share of the
+                                       value, weighted by
+                                       the overlap area.
    ```
 
    The key insight: by shrinking the input pixel before mapping it, drizzle
