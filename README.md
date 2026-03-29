@@ -133,6 +133,14 @@ pil_image.save("output.png")
 
 ## How it works
 
+Take a burst of photos. Your hand shakes slightly between each shot, so each
+frame captures the scene from a slightly different position. Most of these
+shifts are smaller than a single pixel. Drizzle exploits these sub-pixel
+shifts: by knowing exactly where each frame lands, it can piece together a
+higher-resolution image than any single frame contains. It's the same
+technique the Hubble Space Telescope uses to get sharp images from
+undersampled detectors.
+
 ```mermaid
 flowchart LR
     A["Input frames\n(JPEG, PNG, PIL, numpy)"] --> B["Align\nORB + RANSAC\naffine transforms"]
