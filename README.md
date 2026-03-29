@@ -133,11 +133,49 @@ pil_image.save("output.png")
 
 ## How it works
 
-Each input pixel is shrunk into a "drop" (controlled by `pixfrac`), mapped
-through its affine transform onto a finer output grid, and accumulated with a
-weight proportional to the overlap area. This preserves photometry and
-resolution without the blurring introduced by shift-and-add (`pixfrac=1.0`)
-or the strict requirements of interlacing (`pixfrac=0.0`).
+The pipeline has four stages:
+
+1. **Align** - detect ORB keypoints in each frame, match against a reference
+   frame, and RANSAC-fit a full affine transform (translation, rotation, scale,
+   shear).
+
+2. **Estimate scale** - analyze the sub-pixel fractional offsets across all
+   frames. If the dither pattern covers a 2x2 grid of sub-pixel phases, 2x
+   superresolution is justified. If 3x3, then 3x, and so on.
+
+3. **Drizzle** - the core Fruchter & Hook algorithm. Each input pixel is shrunk
+   into a smaller "drop" (controlled by `pixfrac`) and mapped through its
+   affine transform onto the higher-resolution output grid. The contribution to
+   each output pixel is weighted by the overlap area between the drop and the
+   output pixel.
+
+   ```
+   Input Frame               Output Grid (2x)
+    _________                 _________________
+   | A  | B  |               |    |    |    |   |
+   |  .-+-.  |    affine     | .--+-. /    |   |
+   |  |/| |  |   -------->   | |A | / |    |   |
+   |--+-+--+-|   transform   |-+--+/--+----|---|
+   |  | |/ |  |   + shrink   | | / B  |    |   |
+   |  `-+--'  |               | +----'|    |   |
+   |____|_____|               |____|____|____|___|
+
+   Shrunken "drops"           Area-weighted
+   from input pixels          accumulation
+   ```
+
+   The key insight: by shrinking the input pixel before mapping it, drizzle
+   avoids reconvolving the image with the detector's pixel response function.
+   This is what preserves resolution. The `pixfrac` parameter controls the
+   trade-off:
+
+   - `pixfrac=1.0` (shift-and-add) - no shrinking, maximum S/N, but blurs
+   - `pixfrac=0.0` (interlacing) - point samples, maximum resolution, but
+     requires perfectly placed dithers
+   - `pixfrac=0.6` (default) - a good balance for most real-world data
+
+4. **Output** - normalize the accumulated image by the weight map and convert
+   to the requested format.
 
 ## Dependencies
 
