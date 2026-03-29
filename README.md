@@ -37,14 +37,23 @@ cd superdrizzle
 uv sync
 ```
 
+## Quick Start
+
+```python
+import superdrizzle
+
+result = superdrizzle.drizzle(["frame1.jpg", "frame2.jpg", "frame3.jpg"])
+result.save("output.png")
+```
+
+That's it. Frames are auto-aligned, the scale factor is estimated from the
+dither pattern, and you get back a PIL Image.
+
 ## CLI
 
 ```bash
 superdrizzle frame*.jpg -o output.png
 ```
-
-All frames are automatically aligned (ORB + RANSAC), and the output scale
-factor is estimated from the sub-pixel dither coverage.
 
 ### Options
 
@@ -56,59 +65,61 @@ factor is estimated from the sub-pixel dither coverage.
 | `--weights` | Also write a weight map | off |
 | `--ref` | Index of reference frame | 0 |
 
-### Examples
+## API
 
-```bash
-# Auto-detect scale from dither pattern
-superdrizzle burst/*.jpg -o result.png
-
-# Force 3x superresolution
-superdrizzle burst/*.jpg -o result_3x.png -s 3
-
-# Write weight map to see coverage
-superdrizzle burst/*.jpg -o result.png --weights
-# -> result.png + result_weights.png
-```
-
-## Library
+### One-liner
 
 ```python
 import superdrizzle
 
-# Read images as float32 [0, 1] arrays
-images = superdrizzle.read_images(["frame01.jpg", "frame02.jpg", "frame03.jpg"])
+# Accepts file paths, PIL Images, numpy arrays, or file objects
+result = superdrizzle.drizzle(["frame1.jpg", "frame2.jpg"])
+result = superdrizzle.drizzle([pil_img1, pil_img2])
+result = superdrizzle.drizzle(numpy_arrays)
 
-# Compute affine transforms (ORB + RANSAC)
-transforms = superdrizzle.compute_transforms(images, ref=0)
-
-# Auto-estimate scale from sub-pixel dither coverage
-scale = superdrizzle.estimate_scale(transforms)
-
-# Drizzle combine
-result, weights = superdrizzle.drizzle_combine(images, transforms, scale=scale, pixfrac=0.6)
-
-# Write output
-superdrizzle.write_image("output.png", result, weights=weights)
+# With options
+result = superdrizzle.drizzle(images, scale=3, pixfrac=0.4)
 ```
 
-### API
+### Pipeline (when you want intermediate results)
 
-**`read_images(paths) -> list[ndarray]`**
-Read images as float32 RGB arrays normalized to [0, 1]. EXIF orientation is
-applied automatically. All images must have the same dimensions.
+```python
+from superdrizzle import Pipeline
 
-**`compute_transforms(images, ref=0) -> list[ndarray | None]`**
-Compute 2x3 affine transforms mapping each frame onto the reference.
-Returns `None` for frames that couldn't be aligned.
+pipe = Pipeline(["frame1.jpg", "frame2.jpg", "frame3.jpg"])
 
-**`estimate_scale(transforms) -> int`**
-Estimate the best integer scale factor (1-4) from sub-pixel dither coverage.
+pipe.transforms    # list of 2x3 affine matrices
+pipe.scale         # auto-estimated scale factor
+pipe.n_aligned     # how many frames aligned
 
-**`drizzle_combine(images, transforms, scale, pixfrac) -> (ndarray, ndarray)`**
-Combine images using area-weighted drop accumulation. Returns `(output, weight_map)`.
+result, weights = pipe.combine(scale=2, pixfrac=0.6)
+result.save("output.png")  # PIL Image
+```
 
-**`write_image(path, data, weights=None)`**
-Write a float32 image to disk. Pass `weights` to also write a weight map.
+### Bare functions (full control)
+
+```python
+from superdrizzle import (
+    load, compute_transforms, estimate_scale, drizzle_combine, to_pil
+)
+
+images = [load(p) for p in paths]          # flexible input -> float32 numpy
+transforms = compute_transforms(images)     # ORB + RANSAC affine
+scale = estimate_scale(transforms)          # from sub-pixel coverage
+result, weights = drizzle_combine(          # area-weighted drops
+    images, transforms, scale=scale, pixfrac=0.6
+)
+pil_image = to_pil(result)                 # numpy -> PIL
+```
+
+### Input types
+
+`superdrizzle.load()` and all high-level functions accept:
+
+- `str` or `pathlib.Path` (file paths)
+- File objects with `.read()` (binary streams)
+- `PIL.Image.Image`
+- `numpy.ndarray` (uint8 or float32)
 
 ## How it works
 
@@ -118,26 +129,11 @@ weight proportional to the overlap area. This preserves photometry and
 resolution without the blurring introduced by shift-and-add (`pixfrac=1.0`)
 or the strict requirements of interlacing (`pixfrac=0.0`).
 
-```
-Input Pixels          Output Grid
- ___________          _______________
-|     |     |        |   |   |   |   |
-|  *--+--*  |  --->  | * | * |   |   |
-|  |  |  |  |        |   |   |   |   |
-|--+--+--+--|        |---+---+---+---|
-|  |  |  |  |        |   | * | * |   |
-|  *--+--*  |        |   |   |   |   |
-|_____|_____|        |___|___|___|___|
-
- Shrunken "drops"     Area-weighted
- mapped through        accumulation
- affine transform
-```
-
 ## Dependencies
 
 - numpy
 - opencv-python
+- Pillow
 
 ## Reference
 
