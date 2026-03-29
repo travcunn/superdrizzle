@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import tempfile
 import os
-from drizzle.io import read_images, write_image
+from superdrizzle.io import read_images, write_image
 
 
 def _make_test_image(path: str, h: int, w: int, color: tuple[int, int, int]) -> None:

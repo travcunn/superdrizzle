@@ -1,5 +1,5 @@
 import numpy as np
-from drizzle.drizzle import drizzle_combine
+from superdrizzle.drizzle import drizzle_combine
 
 
 def test_single_frame_identity_pixfrac_1():

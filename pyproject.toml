@@ -1,5 +1,5 @@
 [project]
-name = "drizzle"
+name = "superdrizzle"
 version = "0.1.0"
 description = "Combine dithered images into higher-resolution output using the Fruchter & Hook drizzle algorithm"
 requires-python = ">=3.11"
@@ -9,14 +9,14 @@ dependencies = [
 ]
 
 [project.scripts]
-drizzle = "drizzle.cli:main"
+superdrizzle = "superdrizzle.cli:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/drizzle"]
+packages = ["src/superdrizzle"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

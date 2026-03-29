@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-from drizzle.align import compute_transforms
+from superdrizzle.align import compute_transforms
 
 
 def _make_textured_image(h: int, w: int, seed: int = 42) -> np.ndarray:

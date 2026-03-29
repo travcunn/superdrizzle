@@ -1,4 +1,4 @@
-# Drizzle
+# superdrizzle
 
 Combine multiple dithered images into a higher-resolution output using the
 Fruchter & Hook (2002) [Variable-Pixel Linear Reconstruction](https://arxiv.org/abs/astro-ph/9808087)
@@ -22,7 +22,7 @@ uv sync
 ## CLI
 
 ```bash
-drizzle frame*.jpg -o output.png
+superdrizzle frame*.jpg -o output.png
 ```
 
 All frames are automatically aligned (ORB + RANSAC), and the output scale
@@ -42,35 +42,35 @@ factor is estimated from the sub-pixel dither coverage.
 
 ```bash
 # Auto-detect scale from dither pattern
-drizzle burst/*.jpg -o result.png
+superdrizzle burst/*.jpg -o result.png
 
 # Force 3x superresolution
-drizzle burst/*.jpg -o result_3x.png -s 3
+superdrizzle burst/*.jpg -o result_3x.png -s 3
 
 # Write weight map to see coverage
-drizzle burst/*.jpg -o result.png --weights
+superdrizzle burst/*.jpg -o result.png --weights
 # -> result.png + result_weights.png
 ```
 
 ## Library
 
 ```python
-import drizzle
+import superdrizzle
 
 # Read images as float32 [0, 1] arrays
-images = drizzle.read_images(["frame01.jpg", "frame02.jpg", "frame03.jpg"])
+images = superdrizzle.read_images(["frame01.jpg", "frame02.jpg", "frame03.jpg"])
 
 # Compute affine transforms (ORB + RANSAC)
-transforms = drizzle.compute_transforms(images, ref=0)
+transforms = superdrizzle.compute_transforms(images, ref=0)
 
 # Auto-estimate scale from sub-pixel dither coverage
-scale = drizzle.estimate_scale(transforms)
+scale = superdrizzle.estimate_scale(transforms)
 
 # Drizzle combine
-result, weights = drizzle.drizzle_combine(images, transforms, scale=scale, pixfrac=0.6)
+result, weights = superdrizzle.drizzle_combine(images, transforms, scale=scale, pixfrac=0.6)
 
 # Write output
-drizzle.write_image("output.png", result, weights=weights)
+superdrizzle.write_image("output.png", result, weights=weights)
 ```
 
 ### API

@@ -37,7 +37,7 @@ def test_cli_produces_output():
         paths = _make_test_scene(d)
         out = os.path.join(d, "result.png")
         result = subprocess.run(
-            ["uv", "run", "drizzle"] + paths + ["-o", out, "-s", "2", "--weights"],
+            ["uv", "run", "superdrizzle"] + paths + ["-o", out, "-s", "2", "--weights"],
             capture_output=True,
             text=True,
             cwd="/Users/tcunningham/drizzle",
@@ -58,7 +58,7 @@ def test_cli_auto_scale():
         paths = _make_test_scene(d)
         out = os.path.join(d, "result.png")
         result = subprocess.run(
-            ["uv", "run", "drizzle"] + paths + ["-o", out],
+            ["uv", "run", "superdrizzle"] + paths + ["-o", out],
             capture_output=True,
             text=True,
             cwd="/Users/tcunningham/drizzle",

@@ -1,5 +1,5 @@
 import numpy as np
-from drizzle.estimate import estimate_scale
+from superdrizzle.estimate import estimate_scale
 
 
 def test_half_pixel_dithers_gives_2x():
