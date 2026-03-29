@@ -9,14 +9,24 @@ or any set of images with sub-pixel offsets between frames.
 
 ## Install
 
+From PyPI:
+
 ```bash
-pip install .
+pip install superdrizzle
 ```
 
-Or with [uv](https://docs.astral.sh/uv/):
+From GitHub:
 
 ```bash
-uv sync
+pip install git+https://github.com/travcunn/superdrizzle.git
+```
+
+For development:
+
+```bash
+git clone https://github.com/travcunn/superdrizzle.git
+cd superdrizzle
+pip install -e .
 ```
 
 ## CLI
