@@ -33,6 +33,10 @@ def main() -> None:
         "--ref", type=int, default=0,
         help="Index of reference frame (default: 0)",
     )
+    parser.add_argument(
+        "--no-progress", action="store_true",
+        help="Disable progress bar",
+    )
     args = parser.parse_args()
 
     # 1. Read
@@ -63,7 +67,7 @@ def main() -> None:
     aligned_transforms = [t for t in transforms if t is not None]
     result, weights = drizzle_combine(
         aligned_images, aligned_transforms, scale=scale, pixfrac=args.pixfrac,
-        progress=True,
+        progress=not args.no_progress,
     )
 
     # 5. Write
