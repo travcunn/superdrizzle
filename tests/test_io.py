@@ -66,3 +66,24 @@ def test_write_image_weight_map():
         write_image(out, data, weights=weights)
         weight_path = os.path.join(d, "out_weights.png")
         assert os.path.exists(weight_path)
+
+
+from superdrizzle.io import to_pil
+from PIL import Image
+
+
+def test_to_pil_returns_pil_image():
+    data = np.random.rand(10, 10, 3).astype(np.float32)
+    result = to_pil(data)
+    assert isinstance(result, Image.Image)
+    assert result.size == (10, 10)
+    assert result.mode == "RGB"
+
+
+def test_to_pil_clamps_values():
+    data = np.array([[[1.5, -0.1, 0.5]]], dtype=np.float32)
+    result = to_pil(data)
+    px = result.getpixel((0, 0))
+    assert px[0] == 255  # clamped from 1.5
+    assert px[1] == 0    # clamped from -0.1
+    assert px[2] == 127  # 0.5 * 255 = 127.5, truncated to 127

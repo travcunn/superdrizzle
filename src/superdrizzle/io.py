@@ -1,25 +1,25 @@
-"""Image I/O: read JPEG/PNG into float32 [0,1] arrays, write results back."""
+"""Image I/O: read/write images, convert between formats."""
 
 from pathlib import Path
 
 import cv2
 import numpy as np
+from PIL import Image
+
+from superdrizzle.load import load
 
 
 def read_images(paths: list[str]) -> list[np.ndarray]:
     """Read images from paths, return as list of float32 arrays normalized to [0, 1].
 
-    All images must have the same dimensions. Images are converted to RGB
-    (OpenCV reads as BGR). EXIF orientation is applied automatically by OpenCV 4.x+.
+    All images must have the same dimensions. EXIF orientation is applied
+    automatically by OpenCV 4.x+.
     """
     images: list[np.ndarray] = []
     first_shape: tuple[int, ...] | None = None
 
     for p in paths:
-        img = cv2.imread(p, cv2.IMREAD_COLOR)
-        if img is None:
-            raise FileNotFoundError(f"Could not read image: {p}")
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = load(p)
 
         if first_shape is None:
             first_shape = img.shape
@@ -29,9 +29,16 @@ def read_images(paths: list[str]) -> list[np.ndarray]:
                 f"expected {first_shape}"
             )
 
-        images.append(img.astype(np.float32) / 255.0)
+        images.append(img)
 
     return images
+
+
+def to_pil(data: np.ndarray) -> Image.Image:
+    """Convert a float32 [0, 1] RGB numpy array to a PIL Image."""
+    clipped = np.clip(data, 0.0, 1.0)
+    uint8 = (clipped * 255.0).astype(np.uint8)
+    return Image.fromarray(uint8, mode="RGB")
 
 
 def write_image(
