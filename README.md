@@ -74,11 +74,11 @@ import superdrizzle
 
 # Accepts file paths, PIL Images, numpy arrays, or file objects
 result = superdrizzle.drizzle(["frame1.jpg", "frame2.jpg"])
-result = superdrizzle.drizzle([pil_img1, pil_img2])
-result = superdrizzle.drizzle(numpy_arrays)
+result.save("output.png")
 
 # With options
 result = superdrizzle.drizzle(images, scale=3, pixfrac=0.4)
+result.save("output_3x.png")
 ```
 
 ### Pipeline (when you want intermediate results)
@@ -110,6 +110,7 @@ result, weights = drizzle_combine(          # area-weighted drops
     images, transforms, scale=scale, pixfrac=0.6
 )
 pil_image = to_pil(result)                 # numpy -> PIL
+pil_image.save("output.png")
 ```
 
 ### Input types
