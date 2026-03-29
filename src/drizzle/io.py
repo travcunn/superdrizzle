@@ -10,7 +10,7 @@ def read_images(paths: list[str]) -> list[np.ndarray]:
     """Read images from paths, return as list of float32 arrays normalized to [0, 1].
 
     All images must have the same dimensions. Images are converted to RGB
-    (OpenCV reads as BGR).
+    (OpenCV reads as BGR). EXIF orientation is applied automatically by OpenCV 4.x+.
     """
     images: list[np.ndarray] = []
     first_shape: tuple[int, ...] | None = None
