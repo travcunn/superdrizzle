@@ -64,6 +64,7 @@ superdrizzle frame*.jpg -o output.png
 | `-p, --pixfrac` | Drop shrink factor (0.0-1.0) | 0.6 |
 | `--weights` | Also write a weight map | off |
 | `--ref` | Index of reference frame | 0 |
+| `--no-progress` | Disable progress bar | off |
 
 ## API
 
