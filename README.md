@@ -133,58 +133,76 @@ pil_image.save("output.png")
 
 ## How it works
 
-```mermaid
-flowchart LR
-    A["Input frames\n(JPEG, PNG, PIL, numpy)"] --> B["Align\nORB + RANSAC\naffine transforms"]
-    B --> C["Estimate scale\nanalyze sub-pixel\ndither coverage"]
-    C --> D["Drizzle\nshrink pixels into drops,\nmap onto finer grid,\narea-weighted accumulation"]
-    D --> E["Output\nnormalize by\nweight map"]
-```
-
-**Align** - detect ORB keypoints in each frame, match against a reference
-frame, and RANSAC-fit a full affine transform (translation, rotation, scale,
-shear).
-
-**Estimate scale** - analyze the sub-pixel fractional offsets across all
-frames. If the dither pattern covers a 2x2 grid of sub-pixel phases, 2x
-superresolution is justified. If 3x3, then 3x, and so on.
-
-**Drizzle** - the core Fruchter & Hook algorithm. Each input pixel is shrunk
-into a smaller "drop" (controlled by `pixfrac`) and mapped through its affine
-transform onto the higher-resolution output grid. The contribution to each
-output pixel is weighted by the overlap area between the drop and the output
-pixel.
+### Pipeline
 
 ```mermaid
 flowchart LR
-    subgraph Input
-        P["Input pixel"]
+    subgraph read ["1. Read"]
+        A1["Load images as\nfloat32 RGB arrays\n(EXIF orientation applied)"]
     end
-    subgraph Shrink
-        D["Drop\n(pixfrac = 0.6)"]
+    subgraph align ["2. Align"]
+        B1["Detect ORB keypoints\nin each frame"]
+        B2["Match keypoints against\nreference frame (BFMatcher)"]
+        B3["RANSAC-fit 6-parameter\naffine transform\n(translation, rotation,\nscale, shear)"]
+        B1 --> B2 --> B3
     end
-    subgraph Output ["Output grid (2x finer)"]
-        direction TB
-        O1["pixel"] --- O2["pixel"]
-        O3["pixel"] --- O4["pixel"]
+    subgraph estimate ["3. Estimate scale"]
+        C1["Extract sub-pixel\nfractional offsets\nfrom transforms"]
+        C2["Bin into NxN grid\nfor each candidate\nscale (2x, 3x, 4x)"]
+        C3["Pick highest scale\nwith >50% bin coverage"]
+        C1 --> C2 --> C3
     end
-    P -- "shrink by\npixfrac" --> D
-    D -- "affine\ntransform" --> Output
+    subgraph drizzle ["4. Drizzle"]
+        D1["For each frame:\nshrink pixels into drops\n(pixfrac controls size)"]
+        D2["Map drops through\naffine transform onto\nhigher-res output grid"]
+        D3["Accumulate weighted by\noverlap area between\ndrop and output pixel"]
+        D1 --> D2 --> D3
+    end
+    subgraph output ["5. Output"]
+        E1["Normalize accumulated\nimage by weight map"]
+        E2["Convert to PIL Image\nor write to disk"]
+        E1 --> E2
+    end
+    read --> align --> estimate --> drizzle --> output
 ```
 
-The drop lands across multiple output pixels. Each output pixel receives a
-share of the input value proportional to the overlap area. By shrinking the
-pixel before mapping, drizzle avoids reconvolving the image with the
-detector's pixel response function, which is what preserves resolution.
+### The drizzle kernel
+
+The core algorithm (step 4) is what makes this different from simple stacking.
+When you shift-and-add images, you reconvolve with the detector's pixel
+footprint, which blurs the result. Drizzle avoids this by shrinking each input
+pixel into a smaller "drop" before mapping it onto the output grid:
+
+```mermaid
+flowchart TD
+    subgraph step1 ["Each input pixel is shrunk"]
+        direction LR
+        P["Input pixel\n(full size)"]
+        D["Drop\n(smaller by pixfrac)"]
+        P -- "pixfrac = 0.6\nshrink to 60%" --> D
+    end
+    subgraph step2 ["Drop is mapped onto finer output grid"]
+        direction LR
+        G["Output grid\n(2x, 3x, or 4x\nfiner than input)"]
+    end
+    subgraph step3 ["Overlap determines contribution"]
+        direction LR
+        W["Output pixel value =\nsum of (drop value * overlap area * weight)\n/ total weight"]
+    end
+    step1 --> step2 --> step3
+```
+
+Because the drop is smaller than the original pixel, it typically straddles
+only 1-4 output pixels instead of covering a large area. This preserves the
+high-frequency information that shift-and-add would blur away.
 
 The `pixfrac` parameter controls the trade-off:
-- `pixfrac=1.0` (shift-and-add) - no shrinking, maximum S/N, but blurs
-- `pixfrac=0.0` (interlacing) - point samples, maximum resolution, but
-  requires perfectly placed dithers
-- `pixfrac=0.6` (default) - a good balance for most real-world data
 
-**Output** - normalize the accumulated image by the weight map and convert to
-the requested format.
+| pixfrac | Method | Resolution | S/N | When to use |
+|---------|--------|------------|-----|-------------|
+| 1.0 | shift-and-add | lowest | highest | many frames, don't need sharpness |
+| 0.6 | drizzle (default) | good | good | most real-world data |
+| 0.0 | interlacing | highest | lowest | perfectly placed dithers only |
 
 ## Dependencies
 
