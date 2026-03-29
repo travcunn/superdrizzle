@@ -72,8 +72,16 @@ superdrizzle frame*.jpg -o output.png
 ```python
 import superdrizzle
 
-# Accepts file paths, PIL Images, numpy arrays, or file objects
+# From file paths
 result = superdrizzle.drizzle(["frame1.jpg", "frame2.jpg"])
+result.save("output.png")
+
+# From PIL Images
+result = superdrizzle.drizzle([pil_img1, pil_img2])
+result.save("output.png")
+
+# From numpy arrays
+result = superdrizzle.drizzle(numpy_arrays)
 result.save("output.png")
 
 # With options
