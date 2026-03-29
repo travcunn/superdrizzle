@@ -126,10 +126,14 @@ pil_image.save("output.png")
 
 `superdrizzle.load()` and all high-level functions accept:
 
-- `str` or `pathlib.Path` (file paths)
+- `str` or `pathlib.Path` (file paths, including RAW formats)
 - File objects with `.read()` (binary streams)
 - `PIL.Image.Image`
 - `numpy.ndarray` (uint8 or float32)
+
+Supported RAW formats: DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF, and
+[20+ others](https://www.libraw.org/supported-cameras). RAW files are
+demosaiced with camera white balance at 16-bit precision.
 
 ## How it works
 
@@ -199,6 +203,8 @@ the requested format.
 - numpy
 - opencv-python
 - Pillow
+- rawpy (RAW photo support via LibRaw)
+- tqdm (progress bars)
 
 ## Reference
 
