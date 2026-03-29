@@ -42,64 +42,170 @@ def generate_test_scene(
     scene_type: str,
     seed: int = 42,
 ) -> np.ndarray:
-    """Generate a high-res test scene with fine detail. Returns uint8 RGB."""
+    """Generate a high-res test scene with fine detail. Returns uint8 RGB.
+
+    Scenes are designed to have content at multiple spatial frequencies,
+    especially near the Nyquist limit of a 2x-downsampled detector, since
+    that's the band drizzle can recover.
+    """
     rng = np.random.RandomState(seed)
 
-    if scene_type == "circles":
-        img = np.full((height, width, 3), 32, dtype=np.uint8)
-        for _ in range(200):
-            cx, cy = rng.randint(0, width), rng.randint(0, height)
-            r = rng.randint(3, min(width, height) // 8)
-            color = tuple(int(c) for c in rng.randint(60, 255, 3))
-            cv2.circle(img, (cx, cy), r, color, -1)
-            cv2.circle(img, (cx, cy), r, (255, 255, 255), 1)
+    if scene_type == "starfield":
+        # Point sources at sub-pixel positions with varying brightness.
+        # The classic drizzle use case from astronomy. Stars are Gaussian
+        # with FWHM of 2-4 pixels (well-sampled at high-res, undersampled
+        # when downsampled by 2x).
+        img = np.full((height, width, 3), 8, dtype=np.float64)
+        n_stars = 300
+        yy, xx = np.mgrid[0:height, 0:width].astype(np.float64)
+        for _ in range(n_stars):
+            cx = rng.uniform(5, width - 5)
+            cy = rng.uniform(5, height - 5)
+            sigma = rng.uniform(1.0, 2.0)
+            brightness = rng.uniform(0.3, 1.0)
+            color = np.array([1.0, 1.0, 1.0]) * brightness
+            # Tint some stars
+            if rng.random() < 0.3:
+                color = color * rng.uniform(0.5, 1.0, 3)
+            gauss = np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * sigma ** 2))
+            for c in range(3):
+                img[:, :, c] += gauss * color[c]
+        return np.clip(img * 255, 0, 255).astype(np.uint8)
+
+    elif scene_type == "siemens":
+        # Siemens star: a radial frequency sweep. The center has the highest
+        # spatial frequency (finest spokes), the edges have the lowest. This
+        # tests resolution recovery at all frequencies in a single image.
+        img = np.zeros((height, width), dtype=np.float64)
+        cy, cx = height / 2, width / 2
+        yy, xx = np.mgrid[0:height, 0:width].astype(np.float64)
+        angle = np.arctan2(yy - cy, xx - cx)
+        n_spokes = 36
+        img = 0.5 + 0.4 * np.sin(n_spokes * angle)
+        # Add a second harmonic for more complexity
+        img += 0.1 * np.sin(2 * n_spokes * angle)
+        img = np.clip(img, 0, 1)
+        rgb = np.stack([img, img, img], axis=2)
+        return (rgb * 255).astype(np.uint8)
+
+    elif scene_type == "resolution":
+        # Resolution test chart: groups of bars at decreasing spacing.
+        # Similar to a USAF 1951 target. Tests whether drizzle can resolve
+        # bar groups that a single frame cannot.
+        img = np.full((height, width, 3), 220, dtype=np.uint8)
+        # Bar groups: 3 bars each, horizontal and vertical, at spacings
+        # from 2px to 16px (at high-res). At 2x downsample, the 2px and 3px
+        # groups are below Nyquist and should be recoverable by drizzle.
+        spacings = [2, 3, 4, 6, 8, 12, 16]
+        n_groups = len(spacings)
+        group_h = height // (n_groups + 1)
+
+        for gi, spacing in enumerate(spacings):
+            y_start = (gi + 1) * group_h - group_h // 2
+            bar_width = max(1, spacing // 2)
+            # Vertical bars on left half
+            x = width // 8
+            for bar in range(3):
+                x1 = x + bar * spacing
+                x2 = x1 + bar_width
+                cv2.rectangle(img, (x1, y_start), (x2, y_start + group_h // 2), (30, 30, 30), -1)
+            # Horizontal bars on right half
+            y = y_start
+            for bar in range(3):
+                y1 = y + bar * spacing
+                y2 = y1 + bar_width
+                x_start = width // 2 + width // 8
+                cv2.rectangle(img, (x_start, y1), (x_start + group_h // 2, y2), (30, 30, 30), -1)
+            # Label
+            cv2.putText(img, f"{spacing}px", (4, y_start + 14),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.35, (100, 100, 100), 1)
         return img
 
-    elif scene_type == "text":
-        img = np.full((height, width, 3), 240, dtype=np.uint8)
-        fonts = [cv2.FONT_HERSHEY_SIMPLEX, cv2.FONT_HERSHEY_DUPLEX, cv2.FONT_HERSHEY_COMPLEX]
-        words = ["superdrizzle", "benchmark", "resolution", "PSNR", "subpixel",
-                 "Fruchter", "Hook", "2002", "drizzle", "affine"]
-        y = 30
-        while y < height - 30:
-            x = 10
-            while x < width - 100:
-                word = words[rng.randint(0, len(words))]
-                font = fonts[rng.randint(0, len(fonts))]
-                scale = rng.uniform(0.3, 1.2)
-                color = tuple(int(c) for c in rng.randint(0, 100, 3))
-                thickness = rng.randint(1, 3)
-                cv2.putText(img, word, (x, y), font, scale, color, thickness)
-                x += rng.randint(80, 200)
-            y += rng.randint(25, 50)
-        return img
-
-    elif scene_type == "grid":
-        img = np.full((height, width, 3), 200, dtype=np.uint8)
-        for spacing in [4, 8, 16, 32]:
-            region_w = width // 4
-            x_offset = {4: 0, 8: region_w, 16: region_w * 2, 32: region_w * 3}[spacing]
-            for y in range(0, height, spacing):
-                cv2.line(img, (x_offset, y), (x_offset + region_w, y), (40, 40, 40), 1)
-            for x in range(x_offset, x_offset + region_w, spacing):
-                cv2.line(img, (x, 0), (x, height), (40, 40, 40), 1)
-        return img
-
-    elif scene_type == "natural":
+    elif scene_type == "fractal":
+        # Multi-scale fractal noise with sharp edges. Simulates natural
+        # textures (foliage, fabric, terrain) that have energy at all
+        # spatial frequencies following a 1/f power law.
         img = np.zeros((height, width, 3), dtype=np.float64)
         for c in range(3):
-            freq_x = rng.uniform(0.5, 3.0)
-            freq_y = rng.uniform(0.5, 3.0)
-            phase = rng.uniform(0, 2 * np.pi)
-            yy, xx = np.mgrid[0:height, 0:width]
-            img[:, :, c] = 0.5 + 0.3 * np.sin(2 * np.pi * freq_x * xx / width + phase) * \
-                np.cos(2 * np.pi * freq_y * yy / height)
-        for _ in range(30):
-            x1, y1 = rng.randint(0, width), rng.randint(0, height)
-            x2, y2 = x1 + rng.randint(10, 100), y1 + rng.randint(10, 100)
-            color = rng.uniform(0.2, 0.9, 3)
-            img[y1:y2, x1:x2] = color
+            layer = np.zeros((height, width), dtype=np.float64)
+            # Octaves of Perlin-like noise (simplified: sum of random
+            # frequency sine waves at decreasing amplitude)
+            for octave in range(8):
+                freq = 2 ** octave
+                amplitude = 1.0 / (freq ** 0.8)  # 1/f^0.8 spectrum
+                n_waves = 3
+                for _ in range(n_waves):
+                    kx = rng.uniform(-freq, freq) * 2 * np.pi / width
+                    ky = rng.uniform(-freq, freq) * 2 * np.pi / height
+                    phase = rng.uniform(0, 2 * np.pi)
+                    yy, xx = np.mgrid[0:height, 0:width].astype(np.float64)
+                    layer += amplitude * np.sin(kx * xx + ky * yy + phase) / n_waves
+            img[:, :, c] = layer
+        # Normalize to [0, 1]
+        img = img - img.min()
+        img = img / (img.max() + 1e-10)
+        # Add sharp edges: random Voronoi-like boundaries
+        n_regions = 20
+        centers = np.column_stack([
+            rng.randint(0, width, n_regions),
+            rng.randint(0, height, n_regions),
+        ])
+        region_colors = rng.uniform(0.2, 0.8, (n_regions, 3))
+        yy, xx = np.mgrid[0:height, 0:width]
+        coords = np.stack([xx, yy], axis=2).reshape(-1, 2)
+        dists = np.linalg.norm(
+            coords[:, np.newaxis, :] - centers[np.newaxis, :, :], axis=2
+        )
+        nearest = dists.argmin(axis=1).reshape(height, width)
+        voronoi = region_colors[nearest]
+        # Blend fractal noise with Voronoi regions
+        img = 0.6 * img + 0.4 * voronoi
         return np.clip(img * 255, 0, 255).astype(np.uint8)
+
+    elif scene_type == "edges":
+        # Dense edges at multiple orientations and scales. Diagonal lines,
+        # curves, and corners that test anti-aliasing recovery. This is
+        # where drizzle's sub-pixel positioning shines: reconstructing
+        # edge profiles that were aliased in individual frames.
+        img = np.full((height, width, 3), 200, dtype=np.uint8)
+        # Concentric polygons at varying sizes
+        cx, cy = width // 2, height // 2
+        for n_sides in [3, 4, 5, 6, 8, 12]:
+            for radius in range(20, min(width, height) // 2, 30):
+                angles = np.linspace(0, 2 * np.pi, n_sides + 1)[:-1]
+                angles += rng.uniform(0, np.pi / n_sides)
+                pts = np.array([
+                    [int(cx + radius * np.cos(a)), int(cy + radius * np.sin(a))]
+                    for a in angles
+                ], dtype=np.int32)
+                color = tuple(int(c) for c in rng.randint(20, 120, 3))
+                thickness = rng.choice([1, 2])
+                cv2.polylines(img, [pts], True, color, thickness, cv2.LINE_AA)
+        # Diagonal lines at various angles (anti-aliased)
+        for _ in range(50):
+            x1, y1 = rng.randint(0, width), rng.randint(0, height)
+            angle = rng.uniform(0, 2 * np.pi)
+            length = rng.randint(30, 150)
+            x2 = int(x1 + length * np.cos(angle))
+            y2 = int(y1 + length * np.sin(angle))
+            color = tuple(int(c) for c in rng.randint(20, 100, 3))
+            cv2.line(img, (x1, y1), (x2, y2), color, 1, cv2.LINE_AA)
+        return img
+
+    elif scene_type == "zoneplate":
+        # Zone plate (Fresnel pattern): spatial frequency increases
+        # radially from center. At some radius the frequency crosses the
+        # Nyquist limit of the downsampled detector, creating visible
+        # aliasing. Drizzle should push that boundary outward.
+        yy, xx = np.mgrid[0:height, 0:width].astype(np.float64)
+        cy, cx = height / 2, width / 2
+        r2 = (xx - cx) ** 2 + (yy - cy) ** 2
+        # Frequency increases with radius
+        k = 0.5 / max(width, height)
+        phase = k * r2
+        img = 0.5 + 0.45 * np.cos(2 * np.pi * phase)
+        rgb = np.stack([img, img * 0.95, img * 0.9], axis=2)  # slight warm tint
+        return np.clip(rgb * 255, 0, 255).astype(np.uint8)
 
     raise ValueError(f"Unknown scene type: {scene_type}")
 
@@ -285,7 +391,7 @@ def benchmark_single(
     }
 
 
-SCENES = ["circles", "text", "grid", "natural"]
+SCENES = ["starfield", "siemens", "resolution", "fractal", "edges", "zoneplate"]
 
 
 def run_benchmark(
