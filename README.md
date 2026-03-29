@@ -15,10 +15,18 @@ From PyPI:
 pip install superdrizzle
 ```
 
+Or with [uv](https://docs.astral.sh/uv/):
+
+```bash
+uv add superdrizzle
+```
+
 From GitHub:
 
 ```bash
 pip install git+https://github.com/travcunn/superdrizzle.git
+# or
+uv add git+https://github.com/travcunn/superdrizzle.git
 ```
 
 For development:
@@ -26,7 +34,7 @@ For development:
 ```bash
 git clone https://github.com/travcunn/superdrizzle.git
 cd superdrizzle
-pip install -e .
+uv sync
 ```
 
 ## CLI
