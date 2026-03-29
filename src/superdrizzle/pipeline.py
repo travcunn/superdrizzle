@@ -71,6 +71,7 @@ class Pipeline:
         self,
         scale: int | None = None,
         pixfrac: float = 0.6,
+        progress: bool = False,
     ) -> tuple[Image.Image, np.ndarray]:
         self._ensure_aligned()
         transforms = self._transforms
@@ -87,6 +88,7 @@ class Pipeline:
             raise ValueError("No frames could be aligned")
 
         result, weights = drizzle_combine(
-            aligned_images, aligned_transforms, scale=scale, pixfrac=pixfrac
+            aligned_images, aligned_transforms, scale=scale, pixfrac=pixfrac,
+            progress=progress,
         )
         return to_pil(result), weights

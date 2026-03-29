@@ -3,6 +3,8 @@
 import argparse
 import sys
 
+from tqdm import tqdm
+
 from superdrizzle.align import compute_transforms
 from superdrizzle.drizzle import drizzle_combine
 from superdrizzle.estimate import estimate_scale
@@ -57,11 +59,11 @@ def main() -> None:
         print(f"Auto-estimated scale: {scale}x", file=sys.stderr)
 
     # 4. Drizzle
-    print(f"Drizzling (pixfrac={args.pixfrac}, scale={scale}x)...", file=sys.stderr)
     aligned_images = [img for img, t in zip(images, transforms) if t is not None]
     aligned_transforms = [t for t in transforms if t is not None]
     result, weights = drizzle_combine(
         aligned_images, aligned_transforms, scale=scale, pixfrac=args.pixfrac,
+        progress=True,
     )
 
     # 5. Write

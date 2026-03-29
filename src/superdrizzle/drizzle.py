@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import numpy as np
+from tqdm import tqdm
 
 
 def drizzle_combine(
@@ -6,6 +9,7 @@ def drizzle_combine(
     transforms: list[np.ndarray | None],
     scale: int,
     pixfrac: float,
+    progress: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Combine dithered images using the Fruchter & Hook drizzle algorithm.
 
@@ -20,6 +24,7 @@ def drizzle_combine(
             reference. None entries are skipped.
         scale: superresolution factor (output is scale * input dimensions)
         pixfrac: drop shrink factor [0.0, 1.0]
+        progress: show a tqdm progress bar per frame
 
     Returns:
         (output_image, weight_map) where output_image is float32 (H*scale, W*scale, 3)
@@ -35,7 +40,11 @@ def drizzle_combine(
     # Drop size in output pixel units
     drop_size = pixfrac * scale
 
-    for img, M in zip(images, transforms):
+    pairs = zip(images, transforms)
+    if progress:
+        pairs = tqdm(list(pairs), desc="Drizzling", unit="frame", file=__import__("sys").stderr)
+
+    for img, M in pairs:
         if M is None:
             continue
         _drizzle_one(img, M, scale, drop_size, numerator, weight_map)
